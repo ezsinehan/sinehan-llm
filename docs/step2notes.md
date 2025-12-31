@@ -22,3 +22,5 @@ FastAPI uses Pydantic extensively - Request and response validation, settings ma
 Make sure to install using a venv to activate .\venv\Scripts\Activate.ps1
 
 You can install the packages using pip install -r requirements.txt and update requirements using pip freeze > requirements.txt
+
+okay finished step 2
