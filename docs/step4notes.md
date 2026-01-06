@@ -45,4 +45,4 @@ Only accepting markdown to ease complexity.
 
 Small Chunk Merging Logic - Merge backwords with prev chunk and if both are small merge both since small chunks retrieve noisily, merge backwards since language builds forward, unless its the first chunk then forward. 
 
-Now actually building... Finished the chunk models and tested, now the text extractor, done and tested
+Now actually building... Finished the chunk models and tested, now the text extractor, done and tested, text cleaner done and texted
