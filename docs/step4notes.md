@@ -47,4 +47,4 @@ Small Chunk Merging Logic - Merge backwords with prev chunk and if both are smal
 
 Now actually building... Finished the chunk models and tested, now the text extractor, done and tested, text cleaner done and texted
 
-next is the chunker which is the main logic...
+next is the chunker which is the main logic... I want todo this myself though it will take a longer time... it seems possible todo
