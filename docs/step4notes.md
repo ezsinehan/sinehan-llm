@@ -47,4 +47,9 @@ Small Chunk Merging Logic - Merge backwords with prev chunk and if both are smal
 
 Now actually building... Finished the chunk models and tested, now the text extractor, done and tested, text cleaner done and texted
 
-next is the chunker which is the main logic... I want todo this myself though it will take a longer time... it seems possible todo
+next is the chunker which is the main logic... Okay so I have an untested implementation but very foreign to me, learning the code now: 
+What is a regex string? - '^##\s+(.+)$' is just a string by itsefl it does nothing, it is data not behavior. 
+What re.compile does? - Two concrete things: One it parses the pattern once, reading the string analyzing its structure and builds a internal representation, this internal form is not a string anymore. Two it returns a pattern object, stores the parsed regex and stores the flags multiline, exposes methods.
+Why does this matter? - without compile we could do this re.finditer(r'^##\s+(.+)$', text, re.MULTILINE) but this leads python to re-parse the regex string and rebuild the internal search machine everytime you call it. 
+With compile - You parse and build once. Then you can search as many times as needed. 
+Without re.MULTILINE, the regex engine treat the input text as one long line.
