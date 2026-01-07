@@ -65,3 +65,22 @@ Step 1 Decisions - Split by Headings:
 - Empty sections (heading with no content) are dropped
 - Section titles stored as plain text (no ## prefix)
 - Regex: ^##\s+(.+)$ with re.MULTILINE
+
+Step 2 Decisions - Split by Paragraphs:
+- Paragraphs split on double newlines (\n\n or more)
+- Section > 600 tokens triggers paragraph split
+- All paragraph chunks inherit same section_title
+- Heading line removed from chunk.text (stored in metadata only)
+- Embedding will combine: f"{section_title}\n\n{text}" (Option B)
+- chunk_index is sequential across all chunks (not per-section)
+
+Step 3 Decisions - Split by Sentences:
+- Paragraph > 600 tokens triggers sentence/unit split
+- Simple sentence detection: split on ". ", "! ", "? " (user avoids abbreviations)
+- List items (-, *, 1.) are atomic units - never split mid-item
+- Units grouped together until approaching 600 tokens
+- Single extremely long sentence stays whole (can't split mid-sentence)
+- Regex for list items: ^\s*(-|\*|\d+\.)\s+
+---
+
+Okay at this stage step 3 is implemented and tested by ai but I still want to manually look over it and make sure all is well.

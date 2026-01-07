@@ -72,6 +72,139 @@ def split_by_paragraphs(text: str) -> List[str]:
     return [p.strip() for p in paragraphs if p.strip()]
 
 
+def split_into_units(text: str) -> List[str]:
+    """
+    Split text into atomic units: sentences and list items.
+    
+    Units are the smallest pieces we'll work with - we never split mid-unit.
+    - Sentences: split on '. ', '! ', '? ' (simple approach)
+    - List items: each line starting with '- ', '* ', or '1. ' etc.
+    
+    Args:
+        text: Text to split into units
+        
+    Returns:
+        List of units (sentences and/or list items)
+    """
+    units: List[str] = []
+    lines = text.split('\n')
+    
+    # Regex to detect list items:
+    # ^        : start of string
+    # \s*      : optional leading whitespace
+    # (-|\*|\d+\.) : dash, asterisk, or number with dot (1., 2., etc.)
+    # \s+      : one or more spaces after the marker
+    list_item_pattern = re.compile(r'^\s*(-|\*|\d+\.)\s+')
+    
+    current_prose = []  # Accumulate non-list lines
+    
+    for line in lines:
+        if list_item_pattern.match(line):
+            # This line is a list item
+            # First, flush any accumulated prose as sentences
+            if current_prose:
+                prose_text = ' '.join(current_prose)
+                sentences = split_into_sentences(prose_text)
+                units.extend(sentences)
+                current_prose = []
+            
+            # Add the list item as its own unit
+            units.append(line.strip())
+        else:
+            # Regular prose line - accumulate it
+            if line.strip():
+                current_prose.append(line.strip())
+    
+    # Flush any remaining prose
+    if current_prose:
+        prose_text = ' '.join(current_prose)
+        sentences = split_into_sentences(prose_text)
+        units.extend(sentences)
+    
+    return [u for u in units if u.strip()]
+
+
+def split_into_sentences(text: str) -> List[str]:
+    """
+    Split prose text into sentences using simple punctuation rules.
+    
+    Splits on '. ', '! ', '? ' - the period/exclamation/question mark
+    followed by a space indicates end of sentence.
+    
+    Note: User will avoid abbreviations like "Dr.", "U.S.", "e.g." that
+    would cause incorrect splits.
+    
+    Args:
+        text: Prose text to split into sentences
+        
+    Returns:
+        List of sentences
+    """
+    # Pattern matches sentence-ending punctuation followed by space
+    # ([.!?])  : capture the punctuation mark
+    # \s+      : one or more whitespace after it
+    # We split but keep the punctuation with the sentence using a lookahead
+    
+    # Actually, let's use a different approach:
+    # Split on the pattern, then re-attach punctuation
+    
+    # First, normalize multiple spaces
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    if not text:
+        return []
+    
+    # Split using regex that keeps the delimiter with the preceding text
+    # This pattern matches: any char, then .!? followed by space
+    # We use a positive lookbehind to split AFTER the punctuation+space
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    
+    return [s.strip() for s in sentences if s.strip()]
+
+
+def group_units_by_tokens(units: List[str], max_tokens: int) -> List[str]:
+    """
+    Group units together until approaching the token limit.
+    
+    This creates chunks that are close to max_tokens without exceeding it
+    (when possible). If a single unit exceeds max_tokens, it becomes its
+    own chunk (we never split mid-unit).
+    
+    Args:
+        units: List of atomic units (sentences/list items)
+        max_tokens: Maximum tokens per chunk (soft limit)
+        
+    Returns:
+        List of grouped text chunks
+    """
+    if not units:
+        return []
+    
+    chunks: List[str] = []
+    current_chunk_units: List[str] = []
+    current_token_count = 0
+    
+    for unit in units:
+        unit_tokens = count_tokens(unit)
+        
+        # If adding this unit would exceed limit, finalize current chunk
+        if current_chunk_units and (current_token_count + unit_tokens > max_tokens):
+            # Join current units and add to chunks
+            chunks.append('\n'.join(current_chunk_units))
+            current_chunk_units = []
+            current_token_count = 0
+        
+        # Add unit to current chunk
+        current_chunk_units.append(unit)
+        current_token_count += unit_tokens
+    
+    # Don't forget the last chunk
+    if current_chunk_units:
+        chunks.append('\n'.join(current_chunk_units))
+    
+    return chunks
+
+
 def split_by_headings(text: str) -> List[Tuple[str, str]]:
     """
     Split markdown text into sections based on ## headings.
@@ -165,7 +298,7 @@ def chunk_markdown(
     Main chunking function:
     1. Split by headings [DONE]
     2. For each section: check size, if > 600 tokens split by paragraph [DONE]
-    3. If paragraph > 600 tokens: split by sentences [TODO]
+    3. If paragraph > 600 tokens: split by sentences [DONE]
     4. Merge chunks < 100 tokens with previous (or next if first) [TODO]
     """
     # STEP 1: Split by ## headings
@@ -201,17 +334,32 @@ def chunk_markdown(
             if len(paragraphs) == 0:
                 # Edge case: content exists but no paragraphs (shouldn't happen)
                 text_chunks.append((section_title, content))
-            elif len(paragraphs) == 1:
-                # Only one paragraph but it's > 600 tokens
-                # Step 3 will handle splitting by sentences
-                # For now, keep as single chunk
-                text_chunks.append((section_title, content))
             else:
-                # Multiple paragraphs - each becomes a chunk
-                # All chunks inherit the same section_title
+                # Process each paragraph
                 for paragraph in paragraphs:
-                    if paragraph:  # Skip empty paragraphs
+                    if not paragraph:
+                        continue
+                    
+                    para_tokens = count_tokens(paragraph)
+                    
+                    if para_tokens <= MAX_TOKENS:
+                        # Paragraph is small enough - keep as single chunk
                         text_chunks.append((section_title, paragraph))
+                    else:
+                        # STEP 3: Paragraph too large - split by sentences/list items
+                        # Split into atomic units (sentences and list items)
+                        units = split_into_units(paragraph)
+                        
+                        if len(units) <= 1:
+                            # Single unit or no units - can't split further
+                            # Keep as-is (extremely long sentence edge case)
+                            text_chunks.append((section_title, paragraph))
+                        else:
+                            # Group units together up to MAX_TOKENS
+                            grouped_chunks = group_units_by_tokens(units, MAX_TOKENS)
+                            for chunk_text in grouped_chunks:
+                                if chunk_text:
+                                    text_chunks.append((section_title, chunk_text))
     
     # Convert text chunks to Chunk objects with metadata
     chunks: List[Chunk] = []

@@ -11,6 +11,9 @@ from app.services.chunker import (
     chunk_markdown,
     remove_heading_line,
     split_by_paragraphs,
+    split_into_units,
+    split_into_sentences,
+    group_units_by_tokens,
     count_tokens,
     MAX_TOKENS
 )
@@ -537,22 +540,213 @@ Small content here."""
     print("[PASS] Introduction section splits by paragraph correctly")
 
 
-# Test 29: Single large paragraph stays as one chunk (Step 3 will handle)
-def test_single_large_paragraph_stays_whole():
-    # One giant paragraph > 600 tokens with no paragraph breaks
-    # Need 650+ "Word " to exceed 600 tokens
-    large_para = "This is one giant paragraph. " + "Word " * 650
+# ============================================================================
+# STEP 3: Sentence/Unit Splitting Helpers
+# ============================================================================
+
+print("\n" + "=" * 50)
+print("STEP 3: Sentence Splitting Helpers")
+print("=" * 50)
+
+
+# Test 29: split_into_sentences basic
+def test_split_into_sentences_basic():
+    text = "First sentence here. Second sentence here. Third sentence here."
     
-    text = f"""## Giant Section
+    result = split_into_sentences(text)
+    
+    assert len(result) == 3, f"Expected 3 sentences, got {len(result)}"
+    assert "First sentence" in result[0]
+    assert "Second sentence" in result[1]
+    assert "Third sentence" in result[2]
+    print("[PASS] split_into_sentences splits on period-space")
+
+
+# Test 30: split_into_sentences with different punctuation
+def test_split_into_sentences_punctuation():
+    text = "Is this a question? Yes it is! And this is a statement."
+    
+    result = split_into_sentences(text)
+    
+    assert len(result) == 3, f"Expected 3 sentences, got {len(result)}"
+    assert "question?" in result[0]
+    assert "Yes it is!" in result[1]
+    print("[PASS] split_into_sentences handles ? and !")
+
+
+# Test 31: split_into_units with list items
+def test_split_into_units_list():
+    text = """Here is a list:
+- First item
+- Second item
+- Third item"""
+    
+    result = split_into_units(text)
+    
+    # Should have: 1 sentence + 3 list items = 4 units
+    assert len(result) >= 4, f"Expected at least 4 units, got {len(result)}"
+    
+    # Check list items are preserved
+    list_items = [u for u in result if u.startswith('-')]
+    assert len(list_items) == 3, f"Expected 3 list items, got {len(list_items)}"
+    print("[PASS] split_into_units handles list items")
+
+
+# Test 32: split_into_units with numbered list
+def test_split_into_units_numbered_list():
+    text = """Steps:
+1. First step
+2. Second step
+3. Third step"""
+    
+    result = split_into_units(text)
+    
+    # Check numbered items are preserved
+    numbered_items = [u for u in result if u[0].isdigit()]
+    assert len(numbered_items) == 3, f"Expected 3 numbered items, got {len(numbered_items)}"
+    print("[PASS] split_into_units handles numbered lists")
+
+
+# Test 33: split_into_units with asterisk list
+def test_split_into_units_asterisk_list():
+    text = """Items:
+* Item one
+* Item two"""
+    
+    result = split_into_units(text)
+    
+    asterisk_items = [u for u in result if u.startswith('*')]
+    assert len(asterisk_items) == 2, f"Expected 2 asterisk items, got {len(asterisk_items)}"
+    print("[PASS] split_into_units handles asterisk lists")
+
+
+# Test 34: group_units_by_tokens basic
+def test_group_units_basic():
+    # Create units that together would exceed 600 tokens
+    units = [
+        "Sentence one. " + "Word " * 100,  # ~100 tokens
+        "Sentence two. " + "Word " * 100,  # ~100 tokens
+        "Sentence three. " + "Word " * 100,  # ~100 tokens
+        "Sentence four. " + "Word " * 100,  # ~100 tokens
+        "Sentence five. " + "Word " * 100,  # ~100 tokens
+        "Sentence six. " + "Word " * 100,  # ~100 tokens
+        "Sentence seven. " + "Word " * 100,  # ~100 tokens
+    ]
+    
+    result = group_units_by_tokens(units, MAX_TOKENS)
+    
+    # 700 tokens total, should create 2 groups (each ~350 tokens or so)
+    assert len(result) >= 2, f"Expected at least 2 groups, got {len(result)}"
+    
+    # Each group should be <= MAX_TOKENS (approximately)
+    for i, group in enumerate(result):
+        tokens = count_tokens(group)
+        # Allow some buffer since we don't split mid-unit
+        assert tokens <= MAX_TOKENS + 150, f"Group {i} has {tokens} tokens, too large"
+    
+    print(f"[PASS] group_units_by_tokens creates {len(result)} groups under limit")
+
+
+# Test 35: group_units respects unit boundaries
+def test_group_units_respects_boundaries():
+    # Single large unit should stay intact even if > MAX_TOKENS
+    large_unit = "This is one very long sentence. " + "Word " * 700
+    
+    result = group_units_by_tokens([large_unit], MAX_TOKENS)
+    
+    assert len(result) == 1, "Single unit should stay as single group"
+    assert result[0] == large_unit, "Unit should not be modified"
+    print("[PASS] group_units_by_tokens never splits mid-unit")
+
+
+# ============================================================================
+# STEP 3: Sentence Splitting Logic in chunk_markdown
+# ============================================================================
+
+print("\n" + "=" * 50)
+print("STEP 3: Large Paragraph Splits by Sentences")
+print("=" * 50)
+
+
+# Test 36: Large paragraph with multiple sentences splits
+def test_large_paragraph_splits_by_sentences():
+    # Create a paragraph with many sentences totaling > 600 tokens
+    sentences = [f"Sentence number {i}. " + "Word " * 80 for i in range(10)]
+    large_para = " ".join(sentences)
+    
+    text = f"""## Big Section
 {large_para}"""
     
     chunks = chunk_markdown(text, doc_id="test", sourcename="test.md")
     
-    # Should stay as 1 chunk (Step 3 - sentence splitting - will handle this)
-    assert len(chunks) == 1, f"Single paragraph should stay as 1 chunk, got {len(chunks)}"
-    assert chunks[0].metadata.token_count > MAX_TOKENS, \
-        f"Chunk should exceed MAX_TOKENS, got {chunks[0].metadata.token_count}"
-    print(f"[PASS] Single large paragraph ({chunks[0].metadata.token_count} tokens) stays whole (Step 3 TODO)")
+    # Should have multiple chunks now (was 1 before Step 3)
+    assert len(chunks) >= 2, f"Expected at least 2 chunks, got {len(chunks)}"
+    
+    # Each chunk should be reasonably sized
+    for chunk in chunks:
+        # Allow soft limit buffer
+        assert chunk.metadata.token_count <= MAX_TOKENS + 150, \
+            f"Chunk too large: {chunk.metadata.token_count} tokens"
+    
+    print(f"[PASS] Large paragraph split into {len(chunks)} sentence-based chunks")
+
+
+# Test 37: Large paragraph with list splits correctly
+def test_large_paragraph_with_list_splits():
+    # Create a large list
+    list_items = [f"- Item {i} with description. " + "Word " * 60 for i in range(12)]
+    large_list = "\n".join(list_items)
+    
+    text = f"""## List Section
+Here are the items:
+{large_list}"""
+    
+    chunks = chunk_markdown(text, doc_id="test", sourcename="test.md")
+    
+    # Should split the list into multiple chunks
+    assert len(chunks) >= 2, f"Expected at least 2 chunks, got {len(chunks)}"
+    
+    # All chunks should have same section_title
+    for chunk in chunks:
+        assert chunk.metadata.section_title == "List Section"
+    
+    print(f"[PASS] Large list split into {len(chunks)} chunks (list items as units)")
+
+
+# Test 38: Single long sentence stays as one chunk (can't split further)
+def test_single_long_sentence_stays_whole():
+    # One extremely long sentence with no periods
+    long_sentence = "This is one very long sentence that just keeps going and going " + "word " * 700
+    
+    text = f"""## Long Sentence Section
+{long_sentence}"""
+    
+    chunks = chunk_markdown(text, doc_id="test", sourcename="test.md")
+    
+    # Can't split mid-sentence, so stays as 1 chunk
+    assert len(chunks) == 1, f"Expected 1 chunk (can't split mid-sentence), got {len(chunks)}"
+    print(f"[PASS] Single long sentence ({chunks[0].metadata.token_count} tokens) stays whole (can't split)")
+
+
+# Test 39: Mixed prose and list in large paragraph (all in one paragraph block)
+def test_mixed_prose_and_list():
+    # Create a single large paragraph with prose and inline list
+    # No double newlines so it stays as one paragraph
+    prose_start = "First some introductory text. " + "Word " * 350
+    list_items = "\n".join([f"- Item {i} with some details here" for i in range(5)])
+    prose_end = "And some concluding text here. " + "Word " * 350
+    
+    # All content in ONE paragraph block (no double newlines)
+    large_content = f"{prose_start}\n{list_items}\n{prose_end}"
+    
+    text = f"""## Mixed Section
+{large_content}"""
+    
+    chunks = chunk_markdown(text, doc_id="test", sourcename="test.md")
+    
+    # Should split since total > 600 tokens
+    assert len(chunks) >= 2, f"Expected at least 2 chunks, got {len(chunks)}"
+    print(f"[PASS] Mixed prose/list content creates {len(chunks)} chunks")
 
 
 # Run all tests
@@ -597,10 +791,26 @@ def run_all_tests():
     test_paragraph_chunks_same_section_title()
     test_chunk_indices_sequential()
     test_intro_section_splits()
-    test_single_large_paragraph_stays_whole()
+    
+    # ========================================
+    # STEP 3: Helper function tests
+    # ========================================
+    test_split_into_sentences_basic()
+    test_split_into_sentences_punctuation()
+    test_split_into_units_list()
+    test_split_into_units_numbered_list()
+    test_split_into_units_asterisk_list()
+    test_group_units_basic()
+    test_group_units_respects_boundaries()
+    
+    # STEP 3: Sentence splitting logic tests
+    test_large_paragraph_splits_by_sentences()
+    test_large_paragraph_with_list_splits()
+    test_single_long_sentence_stays_whole()
+    test_mixed_prose_and_list()
     
     print("\n" + "="*50)
-    print("All Step 1 & Step 2 tests passed! [PASS]")
+    print("All Step 1, 2 & 3 tests passed! [PASS]")
     print("="*50)
 
 
