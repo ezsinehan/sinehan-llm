@@ -53,3 +53,15 @@ What re.compile does? - Two concrete things: One it parses the pattern once, rea
 Why does this matter? - without compile we could do this re.finditer(r'^##\s+(.+)$', text, re.MULTILINE) but this leads python to re-parse the regex string and rebuild the internal search machine everytime you call it. 
 With compile - You parse and build once. Then you can search as many times as needed. 
 Without re.MULTILINE, the regex engine treat the input text as one long line.
+
+Nice I understand the split by headings... Next step now.
+
+---
+[AI-GENERATED SUMMARY]
+
+Step 1 Decisions - Split by Headings:
+- Split on ## headings only (# is project title, ### stays within section)
+- Content before first ## becomes "Introduction" section
+- Empty sections (heading with no content) are dropped
+- Section titles stored as plain text (no ## prefix)
+- Regex: ^##\s+(.+)$ with re.MULTILINE

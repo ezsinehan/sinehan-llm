@@ -6,6 +6,71 @@ from app.models.chunk import Chunk, ChunkMetadata
 # Initialize tokenizer once at module level (expensive operation, only do once)
 tokenizer = tiktoken.get_encoding("cl100k_base")
 
+# Soft maximum token threshold - sections/paragraphs above this get split
+# "Soft" means slightly over (e.g., 650) is okay to preserve semantic meaning
+MAX_TOKENS = 600
+
+# EMBEDDING NOTE: chunk.text does NOT include the heading line.
+# When embedding, combine: f"{chunk.metadata.section_title}\n\n{chunk.text}"
+# This keeps storage clean while ensuring embeddings have full context.
+
+
+def count_tokens(text: str) -> int:
+    """
+    Count the number of tokens in text using tiktoken.
+    
+    Args:
+        text: The text to count tokens for
+        
+    Returns:
+        Number of tokens
+    """
+    return len(tokenizer.encode(text))
+
+
+def remove_heading_line(section_content: str) -> str:
+    """
+    Remove the ## heading line from section content.
+    
+    Since section_title is stored in metadata, we don't need the heading
+    in the chunk text. This avoids duplication - citations work via metadata.
+    
+    Args:
+        section_content: Full section text (may start with ## heading)
+        
+    Returns:
+        Section text with heading line removed, stripped of leading whitespace
+    """
+    # Pattern matches a line starting with ## at the beginning of the string
+    # ^        : start of string
+    # ##       : literal ##
+    # [^\n]*   : any characters except newline (the heading text)
+    # \n?      : optional newline after heading
+    heading_pattern = re.compile(r'^##[^\n]*\n?')
+    
+    # Remove the heading line and strip any resulting leading whitespace
+    result = heading_pattern.sub('', section_content)
+    return result.strip()
+
+
+def split_by_paragraphs(text: str) -> List[str]:
+    """
+    Split text into paragraphs using double newlines as delimiter.
+    
+    Args:
+        text: Text to split into paragraphs
+        
+    Returns:
+        List of paragraph strings (empty paragraphs filtered out)
+    """
+    # Split on two or more consecutive newlines
+    # \n{2,} matches \n\n, \n\n\n, etc.
+    paragraphs = re.split(r'\n{2,}', text)
+    
+    # Filter out empty paragraphs and strip whitespace from each
+    # This handles cases like "\n\n\n\n" which would create empty strings
+    return [p.strip() for p in paragraphs if p.strip()]
+
 
 def split_by_headings(text: str) -> List[Tuple[str, str]]:
     """
@@ -90,10 +155,6 @@ def split_by_headings(text: str) -> List[Tuple[str, str]]:
     return sections
 
 
-# ============================================================================
-# MAIN CHUNKING FUNCTION (Steps 2-5 to be implemented)
-# ============================================================================
-
 def chunk_markdown(
     text: str,
     doc_id: str,
@@ -102,23 +163,62 @@ def chunk_markdown(
 ) -> List[Chunk]:
     """
     Main chunking function:
-    1. Split by headings ✓
-    2. For each section: check size
-    3. If > 600 tokens: split by paragraph
-    4. If paragraph > 600 tokens: split by sentences
-    5. Merge chunks < 100 tokens with previous (or next if first)
+    1. Split by headings [DONE]
+    2. For each section: check size, if > 600 tokens split by paragraph [DONE]
+    3. If paragraph > 600 tokens: split by sentences [TODO]
+    4. Merge chunks < 100 tokens with previous (or next if first) [TODO]
     """
     # STEP 1: Split by ## headings
     sections = split_by_headings(text)
     
-    # For now, create one chunk per section (Steps 2-5 will refine this)
+    # Collect all text chunks before creating Chunk objects
+    # Each item: (section_title, chunk_text)
+    text_chunks: List[Tuple[str, str]] = []
+    
+    for section_title, section_content in sections:
+        # Remove the ## heading line from content (Option B)
+        # Heading info is preserved in section_title metadata
+        # "Introduction" sections don't have a heading line to remove
+        if section_title != "Introduction":
+            content = remove_heading_line(section_content)
+        else:
+            content = section_content.strip()
+        
+        # Skip if content is empty after removing heading
+        if not content:
+            continue
+        
+        # STEP 2: Check token count and split if needed
+        token_count = count_tokens(content)
+        
+        if token_count <= MAX_TOKENS:
+            # Section is small enough - keep as single chunk
+            text_chunks.append((section_title, content))
+        else:
+            # Section too large - split by paragraphs
+            paragraphs = split_by_paragraphs(content)
+            
+            if len(paragraphs) == 0:
+                # Edge case: content exists but no paragraphs (shouldn't happen)
+                text_chunks.append((section_title, content))
+            elif len(paragraphs) == 1:
+                # Only one paragraph but it's > 600 tokens
+                # Step 3 will handle splitting by sentences
+                # For now, keep as single chunk
+                text_chunks.append((section_title, content))
+            else:
+                # Multiple paragraphs - each becomes a chunk
+                # All chunks inherit the same section_title
+                for paragraph in paragraphs:
+                    if paragraph:  # Skip empty paragraphs
+                        text_chunks.append((section_title, paragraph))
+    
+    # Convert text chunks to Chunk objects with metadata
     chunks: List[Chunk] = []
     
-    for chunk_index, (section_title, section_content) in enumerate(sections):
-        # Count tokens using tiktoken
-        token_count = len(tokenizer.encode(section_content))
+    for chunk_index, (section_title, chunk_text) in enumerate(text_chunks):
+        token_count = count_tokens(chunk_text)
         
-        # Create metadata for this chunk
         metadata = ChunkMetadata(
             doc_id=doc_id,
             chunk_index=chunk_index,
@@ -128,8 +228,7 @@ def chunk_markdown(
             source_name=sourcename
         )
         
-        # Create the chunk with text and metadata
-        chunk = Chunk(text=section_content, metadata=metadata)
+        chunk = Chunk(text=chunk_text, metadata=metadata)
         chunks.append(chunk)
     
     return chunks
