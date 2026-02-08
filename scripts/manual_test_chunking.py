@@ -1,10 +1,13 @@
 """
-Manual test: run the full pipeline (clean -> chunk) on a markdown file and print chunks with metadata.
-Shows a summary table, then each chunk in full so you can see how large sections are split.
+Manual test: run the full pipeline (clean -> chunk -> embed) on a markdown file.
+Shows chunk summary, full chunk text, then embedding summary and saves embeddings for inspection.
 Usage (from project root, with venv activated):
   python scripts/manual_test_chunking.py
   python scripts/manual_test_chunking.py path/to/your.md
+  python scripts/manual_test_chunking.py path/to/your.md --no-embed   # skip embedding step
 """
+import argparse
+import json
 import sys
 from pathlib import Path
 from collections import defaultdict
@@ -18,11 +21,12 @@ from app.services.chunker import chunk_markdown, MAX_TOKENS, MIN_TOKENS
 
 
 def main():
-    # Default to sample_doc.md in project root; allow override via argv
-    if len(sys.argv) > 1:
-        md_path = Path(sys.argv[1])
-    else:
-        md_path = project_root / "sample_doc.md"
+    parser = argparse.ArgumentParser(description="Run clean -> chunk -> embed on a markdown file.")
+    parser.add_argument("md_file", nargs="?", default=None, help="Path to .md file (default: sample_doc.md)")
+    parser.add_argument("--no-embed", action="store_true", help="Skip embedding step (chunk only)")
+    args = parser.parse_args()
+
+    md_path = Path(args.md_file) if args.md_file else project_root / "sample_doc.md"
 
     if not md_path.exists():
         print(f"File not found: {md_path}")
@@ -102,6 +106,61 @@ def main():
         print(f"CHUNK {m.chunk_index}  |  id={m.chunk_id}  |  section={m.section_title!r}  |  tokens={m.token_count}")
         print("-" * 70)
         print(c.text)
+        print()
+
+    # --- Embedding (optional) ---
+    if not args.no_embed:
+        try:
+            from app.services.embedder import embed_chunks
+        except ModuleNotFoundError as e:
+            if "sentence_transformers" in str(e):
+                print("=" * 70)
+                print("EMBEDDING SKIPPED: sentence-transformers not installed")
+                print("Install with:  pip install sentence-transformers")
+                print("Then run this script again.")
+                print("=" * 70)
+                sys.exit(1)
+            raise
+        from app.config import settings
+
+        print("=" * 70)
+        print("EMBEDDING")
+        print("=" * 70)
+        print(f"Model: {settings.embedding_model_name}")
+        print(f"Dimension: {settings.embedding_dimension}")
+        print("Embedding chunks (section_title + text per chunk)...")
+        vectors = embed_chunks(chunks)
+        print(f"Done. {len(vectors)} vectors, each length {len(vectors[0]) if vectors else 0}")
+        if vectors:
+            preview = vectors[0][:5]
+            print(f"First vector (first 5 values): {[round(x, 4) for x in preview]}")
+        print()
+
+        # Save for inspection
+        out_path = project_root / "manual_test_embeddings.json"
+        payload = {
+            "doc_id": doc_id,
+            "source_name": sourcename,
+            "url": url,
+            "model": settings.embedding_model_name,
+            "dimension": settings.embedding_dimension,
+            "chunks": [
+                {
+                    "chunk_id": c.metadata.chunk_id,
+                    "section_title": c.metadata.section_title,
+                    "chunk_index": c.metadata.chunk_index,
+                    "token_count": c.metadata.token_count,
+                    "text_preview": c.text[:300] + ("..." if len(c.text) > 300 else ""),
+                    "embedding": vectors[i],
+                }
+                for i, c in enumerate(chunks)
+            ],
+        }
+        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        print(f"Saved embeddings to {out_path}")
+        print()
+    else:
+        print("(Embedding skipped: use without --no-embed to run full pipeline)")
         print()
 
     print("=" * 70)

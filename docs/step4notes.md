@@ -96,3 +96,12 @@ Okay at this stage step 3 is implemented and tested by ai but I still want to ma
 
 Next step is working on implementing chunks that are too small most be grouped.
 - We will merge small chunks of the same section
+
+---
+How to run the manual test (chunking + optional embedding)
+- From project root, with venv activated: `python scripts/manual_test_chunking.py`
+- Uses `sample_doc.md` by default. To use another file: `python scripts/manual_test_chunking.py path/to/your.md`
+- By default runs full pipeline: clean text -> chunk -> embed. Output: chunk summary by section, full chunk text, then embedding summary and writes `manual_test_embeddings.json` in project root (chunk_id, section_title, text_preview, embedding vector per chunk).
+- To run chunking only (no embedding): `python scripts/manual_test_chunking.py --no-embed`
+- Requires `sentence-transformers` for embedding: `pip install sentence-transformers`
+- Step 5 (embedding) uses the same script; see step5notes for embedding details.
