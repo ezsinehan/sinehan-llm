@@ -14,8 +14,10 @@ from app.services.chunker import (
     split_into_units,
     split_into_sentences,
     group_units_by_tokens,
+    merge_small_chunks,
     count_tokens,
-    MAX_TOKENS
+    MAX_TOKENS,
+    MIN_TOKENS
 )
 
 print("Testing chunker...\n")
@@ -749,6 +751,109 @@ def test_mixed_prose_and_list():
     print(f"[PASS] Mixed prose/list content creates {len(chunks)} chunks")
 
 
+# ============================================================================
+# STEP 4: Merge Small Chunks
+# ============================================================================
+
+print("\n" + "=" * 50)
+print("STEP 4: Merge Small Chunks")
+print("=" * 50)
+
+
+# Test 40: merge_small_chunks backward merge
+def test_merge_small_backward():
+    # (section_title, text) - second chunk is small, same section
+    text_chunks = [
+        ("Section A", "This is a normal sized chunk. " + "Word " * 80),
+        ("Section A", "Tiny."),
+    ]
+    result = merge_small_chunks(text_chunks)
+    assert len(result) == 1, f"Expected 1 chunk after merge, got {len(result)}"
+    assert "Tiny." in result[0][1]
+    assert result[0][0] == "Section A"
+    print("[PASS] Small chunk merges backward into previous (same section)")
+
+
+# Test 41: merge_small_chunks forward merge (first chunk small)
+def test_merge_small_forward():
+    text_chunks = [
+        ("Section A", "Tiny first."),
+        ("Section A", "Bigger second chunk. " + "Word " * 80),
+    ]
+    result = merge_small_chunks(text_chunks)
+    assert len(result) == 1, f"Expected 1 chunk after merge, got {len(result)}"
+    assert "Tiny first." in result[0][1]
+    assert "Bigger second" in result[0][1]
+    assert result[0][0] == "Section A"
+    print("[PASS] First chunk small -> merges forward into next")
+
+
+# Test 42: no merge across sections
+def test_merge_same_section_only():
+    text_chunks = [
+        ("Section A", "Big chunk. " + "Word " * 80),
+        ("Section B", "Tiny."),  # different section
+        ("Section B", "Another big. " + "Word " * 80),
+    ]
+    result = merge_small_chunks(text_chunks)
+    # Tiny in Section B should merge into "Another big" (same section), not into Section A
+    assert len(result) == 2, f"Expected 2 chunks, got {len(result)}"
+    assert result[0][0] == "Section A"
+    assert result[1][0] == "Section B"
+    assert "Tiny." in result[1][1]
+    print("[PASS] Small chunk only merges with same section")
+
+
+# Test 43: first chunk small but next is different section -> no merge
+def test_merge_first_small_different_section():
+    text_chunks = [
+        ("Section A", "Tiny."),
+        ("Section B", "Content. " + "Word " * 80),
+    ]
+    result = merge_small_chunks(text_chunks)
+    # Cannot merge (different sections), so both stay
+    assert len(result) == 2, f"Expected 2 chunks (no merge across section), got {len(result)}"
+    print("[PASS] First chunk small but next different section -> no merge")
+
+
+# Test 44: chunk_markdown produces fewer chunks when small chunks exist
+def test_chunk_markdown_merges_small():
+    # Two small sections that would each be one chunk; second is tiny
+    text = """## First
+Short content here.
+
+## Second
+Tiny."""
+    chunks = chunk_markdown(text, doc_id="test", sourcename="test.md")
+    # "Second" is tiny - but it's the only chunk in its section, so no sibling to merge with
+    # So we get 2 chunks. To test merge we need two chunks in same section.
+    # Instead: one section with two paragraphs, first big enough, second tiny
+    text2 = """## Only Section
+First paragraph with enough content. """ + "Word " * 80 + """
+
+Second tiny."""
+    chunks2 = chunk_markdown(text2, doc_id="test", sourcename="test.md")
+    # Should merge "Second tiny" into first paragraph (backward)
+    assert len(chunks2) == 1, f"Expected 1 chunk after merging small, got {len(chunks2)}"
+    assert "Second tiny" in chunks2[0].text
+    print("[PASS] chunk_markdown merges small chunk into previous (same section)")
+
+
+# Test 45: consecutive small chunks merge into one
+def test_consecutive_small_merge():
+    text_chunks = [
+        ("Section A", "One. " + "Word " * 50),  # ~50 tokens, under 100
+        ("Section A", "Two."),
+        ("Section A", "Three."),
+    ]
+    result = merge_small_chunks(text_chunks)
+    # First stays (or gets "Two" merged in?), then "Two" and "Three" merge backward
+    # Actually: first chunk has ~50 tokens < 100, so it's small. So we try to merge backward - no previous. Then merge forward - next is same section, so we merge first into second -> (One+Two). Then we have (One+Two) and "Three". Three is small, merge into (One+Two). So one chunk.
+    assert len(result) == 1, f"Expected 1 chunk after merging consecutive small, got {len(result)}"
+    assert "One" in result[0][1] and "Two" in result[0][1] and "Three" in result[0][1]
+    print("[PASS] Consecutive small chunks in same section merge into one")
+
+
 # Run all tests
 def run_all_tests():
     # ========================================
@@ -809,8 +914,18 @@ def run_all_tests():
     test_single_long_sentence_stays_whole()
     test_mixed_prose_and_list()
     
+    # ========================================
+    # STEP 4: Merge small chunks tests
+    # ========================================
+    test_merge_small_backward()
+    test_merge_small_forward()
+    test_merge_same_section_only()
+    test_merge_first_small_different_section()
+    test_chunk_markdown_merges_small()
+    test_consecutive_small_merge()
+    
     print("\n" + "="*50)
-    print("All Step 1, 2 & 3 tests passed! [PASS]")
+    print("All Step 1, 2, 3 & 4 tests passed! [PASS]")
     print("="*50)
 
 

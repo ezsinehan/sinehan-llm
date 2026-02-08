@@ -81,6 +81,18 @@ Step 3 Decisions - Split by Sentences:
 - Units grouped together until approaching 600 tokens
 - Single extremely long sentence stays whole (can't split mid-sentence)
 - Regex for list items: ^\s*(-|\*|\d+\.)\s+
+
+Step 4 Decisions - Merge Small Chunks:
+- Chunks with < 100 tokens (MIN_TOKENS) are merged with a sibling
+- Same section only (same section_title)
+- Prefer merging backward (small chunk merges into previous)
+- If first chunk is small, merge forward into next
+- Separator when concatenating: "\n\n"
+- merge_small_chunks() runs after building text_chunks, before creating Chunk objects
+- chunk_index re-assigned 0, 1, 2... after merge
 ---
 
 Okay at this stage step 3 is implemented and tested by ai but I still want to manually look over it and make sure all is well.
+
+Next step is working on implementing chunks that are too small most be grouped.
+- We will merge small chunks of the same section

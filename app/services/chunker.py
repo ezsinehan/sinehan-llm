@@ -10,6 +10,9 @@ tokenizer = tiktoken.get_encoding("cl100k_base")
 # "Soft" means slightly over (e.g., 650) is okay to preserve semantic meaning
 MAX_TOKENS = 600
 
+# Chunks below this are merged with a sibling (same section) to reduce noisy retrieval
+MIN_TOKENS = 100
+
 # EMBEDDING NOTE: chunk.text does NOT include the heading line.
 # When embedding, combine: f"{chunk.metadata.section_title}\n\n{chunk.text}"
 # This keeps storage clean while ensuring embeddings have full context.
@@ -288,6 +291,51 @@ def split_by_headings(text: str) -> List[Tuple[str, str]]:
     return sections
 
 
+def merge_small_chunks(
+    text_chunks: List[Tuple[str, str]],
+    min_tokens: int = MIN_TOKENS
+) -> List[Tuple[str, str]]:
+    """
+    Merge chunks smaller than min_tokens with a sibling (same section only).
+    Prefer merging backward (into previous chunk); if first chunk is small, merge forward.
+    
+    Args:
+        text_chunks: List of (section_title, chunk_text) in document order
+        min_tokens: Chunks with fewer tokens than this will be merged
+        
+    Returns:
+        Merged list of (section_title, chunk_text) with same structure
+    """
+    if not text_chunks:
+        return []
+    
+    result: List[Tuple[str, str]] = []
+    i = 0
+    
+    while i < len(text_chunks):
+        section_title, text = text_chunks[i]
+        tokens = count_tokens(text)
+        
+        if tokens < min_tokens:
+            # First chunk and small -> merge into next (if same section and next exists)
+            if i == 0 and i + 1 < len(text_chunks) and text_chunks[i + 1][0] == section_title:
+                next_title, next_text = text_chunks[i + 1]
+                result.append((next_title, text + "\n\n" + next_text))
+                i += 2
+                continue
+            # Not first but small -> merge into previous (if same section)
+            if result and result[-1][0] == section_title:
+                prev_title, prev_text = result[-1]
+                result[-1] = (prev_title, prev_text + "\n\n" + text)
+                i += 1
+                continue
+        
+        result.append((section_title, text))
+        i += 1
+    
+    return result
+
+
 def chunk_markdown(
     text: str,
     doc_id: str,
@@ -299,7 +347,7 @@ def chunk_markdown(
     1. Split by headings [DONE]
     2. For each section: check size, if > 600 tokens split by paragraph [DONE]
     3. If paragraph > 600 tokens: split by sentences [DONE]
-    4. Merge chunks < 100 tokens with previous (or next if first) [TODO]
+    4. Merge chunks < 100 tokens with previous (or next if first) [DONE]
     """
     # STEP 1: Split by ## headings
     sections = split_by_headings(text)
@@ -360,6 +408,9 @@ def chunk_markdown(
                             for chunk_text in grouped_chunks:
                                 if chunk_text:
                                     text_chunks.append((section_title, chunk_text))
+    
+    # STEP 4: Merge small chunks (< MIN_TOKENS) with sibling, same section only
+    text_chunks = merge_small_chunks(text_chunks)
     
     # Convert text chunks to Chunk objects with metadata
     chunks: List[Chunk] = []
