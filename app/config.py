@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     gemini_api_key: str
     gemini_model_name: str
 
-    # Vector DB Config
+    # Vector DB Config (Qdrant Cloud: set QDRANT_URL and QDRANT_API_KEY in .env)
     qdrant_url: str
     qdrant_api_key: str
 

@@ -5,6 +5,7 @@ Usage (from project root, with venv activated):
   python scripts/manual_test_chunking.py
   python scripts/manual_test_chunking.py path/to/your.md
   python scripts/manual_test_chunking.py path/to/your.md --no-embed   # skip embedding step
+  python scripts/manual_test_chunking.py path/to/your.md --no-store  # embed but do not store in Qdrant
 """
 import argparse
 import json
@@ -24,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run clean -> chunk -> embed on a markdown file.")
     parser.add_argument("md_file", nargs="?", default=None, help="Path to .md file (default: sample_doc.md)")
     parser.add_argument("--no-embed", action="store_true", help="Skip embedding step (chunk only)")
+    parser.add_argument("--no-store", action="store_true", help="Skip storing in Qdrant (only when embedding)")
     args = parser.parse_args()
 
     md_path = Path(args.md_file) if args.md_file else project_root / "sample_doc.md"
@@ -159,6 +161,32 @@ def main():
         out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(f"Saved embeddings to {out_path}")
         print()
+
+        # --- Store in Qdrant (step 6) ---
+        if not args.no_store:
+            try:
+                from app.services.vector_store import (
+                    COLLECTION_NAME,
+                    ensure_collection,
+                    delete_by_doc_id,
+                    upsert_chunks,
+                )
+                ensure_collection(COLLECTION_NAME)
+                delete_by_doc_id(doc_id, COLLECTION_NAME)
+                upsert_chunks(chunks, vectors, COLLECTION_NAME)
+                print("=" * 70)
+                print("QDRANT STORE")
+                print("=" * 70)
+                print(f"Collection: {COLLECTION_NAME}")
+                print(f"Deleted existing points for doc_id={doc_id!r}, upserted {len(chunks)} points.")
+                print()
+            except Exception as e:
+                print("=" * 70)
+                print("QDRANT STORE FAILED")
+                print("=" * 70)
+                print(f"Error: {e}")
+                print("Check QDRANT_URL and QDRANT_API_KEY in .env. Use --no-store to skip.")
+                print()
     else:
         print("(Embedding skipped: use without --no-embed to run full pipeline)")
         print()
