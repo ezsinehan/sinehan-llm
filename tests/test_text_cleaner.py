@@ -16,7 +16,7 @@ def test_windows_line_endings():
     result = clean_text(text)
     expected = "Line1\nLine2\nLine3"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Windows line endings normalized correctly")
+    print("[OK] Windows line endings normalized correctly")
 
 # Test 2: Mac line endings (\r)
 def test_mac_line_endings():
@@ -24,7 +24,7 @@ def test_mac_line_endings():
     result = clean_text(text)
     expected = "Line1\nLine2\nLine3"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Mac line endings normalized correctly")
+    print("[OK] Mac line endings normalized correctly")
 
 # Test 3: Multiple spaces
 def test_multiple_spaces():
@@ -32,7 +32,7 @@ def test_multiple_spaces():
     result = clean_text(text)
     expected = "Hello world here"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Multiple spaces normalized to single space")
+    print("[OK] Multiple spaces normalized to single space")
 
 # Test 4: Tabs
 def test_tabs():
@@ -40,7 +40,7 @@ def test_tabs():
     result = clean_text(text)
     expected = "Hello world here"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Tabs normalized to single space")
+    print("[OK] Tabs normalized to single space")
 
 # Test 5: Mixed spaces and tabs
 def test_mixed_spaces_tabs():
@@ -48,7 +48,7 @@ def test_mixed_spaces_tabs():
     result = clean_text(text)
     expected = "Hello world here"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Mixed spaces and tabs normalized correctly")
+    print("[OK] Mixed spaces and tabs normalized correctly")
 
 # Test 6: Trailing whitespace on lines
 def test_trailing_whitespace():
@@ -56,7 +56,7 @@ def test_trailing_whitespace():
     result = clean_text(text)
     expected = "Line1\nLine2\nLine3"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Trailing whitespace removed from lines")
+    print("[OK] Trailing whitespace removed from lines")
 
 # Test 7: Leading and trailing whitespace
 def test_leading_trailing_whitespace():
@@ -64,7 +64,7 @@ def test_leading_trailing_whitespace():
     result = clean_text(text)
     expected = "Line1\nLine2"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Leading and trailing whitespace removed")
+    print("[OK] Leading and trailing whitespace removed")
 
 # Test 8: Empty string
 def test_empty_string():
@@ -72,7 +72,7 @@ def test_empty_string():
     result = clean_text(text)
     expected = ""
     assert result == expected, f"Expected empty string, got '{result}'"
-    print("✓ Empty string handled correctly")
+    print("[OK] Empty string handled correctly")
 
 # Test 9: Whitespace only
 def test_whitespace_only():
@@ -80,7 +80,7 @@ def test_whitespace_only():
     result = clean_text(text)
     expected = ""
     assert result == expected, f"Expected empty string, got '{result}'"
-    print("✓ Whitespace-only string returns empty string")
+    print("[OK] Whitespace-only string returns empty string")
 
 # Test 10: Preserve intentional newlines
 def test_preserve_newlines():
@@ -88,7 +88,7 @@ def test_preserve_newlines():
     result = clean_text(text)
     expected = "Line1\n\nLine2\n\n\nLine3"
     assert result == expected, f"Expected newlines preserved, got '{result}'"
-    print("✓ Intentional newlines preserved")
+    print("[OK] Intentional newlines preserved")
 
 # Test 11: Complex mixed scenario
 def test_complex_mixed():
@@ -96,7 +96,7 @@ def test_complex_mixed():
     result = clean_text(text)
     expected = "Hello world\n\n Test\n End"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Complex mixed scenario handled correctly")
+    print("[OK] Complex mixed scenario handled correctly")
 
 # Test 12: Markdown-like content
 def test_markdown_content():
@@ -104,7 +104,7 @@ def test_markdown_content():
     result = clean_text(text)
     expected = "# Title\n\n## Section\n\nContent here"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Markdown content cleaned correctly")
+    print("[OK] Markdown content cleaned correctly")
 
 # Test 13: Single line with spaces
 def test_single_line():
@@ -112,7 +112,7 @@ def test_single_line():
     result = clean_text(text)
     expected = "Hello world"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Single line cleaned correctly")
+    print("[OK] Single line cleaned correctly")
 
 # Test 14: Already clean text
 def test_already_clean():
@@ -120,7 +120,7 @@ def test_already_clean():
     result = clean_text(text)
     expected = "Hello world\nThis is clean"
     assert result == expected, f"Expected unchanged, got '{result}'"
-    print("✓ Already clean text unchanged")
+    print("[OK] Already clean text unchanged")
 
 # Test 15: Mixed line endings
 def test_mixed_line_endings():
@@ -128,7 +128,7 @@ def test_mixed_line_endings():
     result = clean_text(text)
     expected = "Line1\nLine2\nLine3\nLine4"
     assert result == expected, f"Expected '{expected}', got '{result}'"
-    print("✓ Mixed line endings normalized correctly")
+    print("[OK] Mixed line endings normalized correctly")
 
 # Run all tests
 def run_all_tests():
@@ -147,7 +147,7 @@ def run_all_tests():
     test_single_line()
     test_already_clean()
     test_mixed_line_endings()
-    print("\nAll tests passed! ✓")
+    print("\nAll tests passed! [OK]")
 
 # Execute tests
 if __name__ == "__main__":

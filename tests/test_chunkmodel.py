@@ -20,11 +20,11 @@ metadata = ChunkMetadata(
     token_count=150,
     source_name="readme.md"
 )
-print("✓ Valid metadata created")
+print("[OK] Valid metadata created")
 
 # Test 2: chunk_id property
 assert metadata.chunk_id == "project1_5", f"Expected 'project1_5', got '{metadata.chunk_id}'"
-print("✓ chunk_id property works correctly")
+print("[OK] chunk_id property works correctly")
 
 # Test 3: Optional url can be None
 metadata_no_url = ChunkMetadata(
@@ -35,7 +35,7 @@ metadata_no_url = ChunkMetadata(
     token_count=100,
     source_name="doc.md"
 )
-print("✓ Optional url field accepts None")
+print("[OK] Optional url field accepts None")
 
 # Test 4: Missing required field should fail
 try:
@@ -48,7 +48,7 @@ try:
     )
     print("✗ Should have raised ValidationError for missing chunk_index")
 except ValidationError as e:
-    print("✓ Missing required field correctly raises ValidationError")
+    print("[OK] Missing required field correctly raises ValidationError")
 
 # Test 5: Wrong type should fail
 try:
@@ -61,7 +61,7 @@ try:
     )
     print("✗ Should have raised ValidationError for wrong type")
 except ValidationError as e:
-    print("✓ Wrong type correctly raises ValidationError")
+    print("[OK] Wrong type correctly raises ValidationError")
 
 print("\nTesting Chunk...")
 
@@ -70,7 +70,7 @@ chunk = Chunk(
     text="# Introduction\nThis is the text...",
     metadata=metadata
 )
-print("✓ Valid chunk created")
+print("[OK] Valid chunk created")
 
 # Test 7: Missing metadata should fail
 try:
@@ -80,6 +80,6 @@ try:
     )
     print("✗ Should have raised ValidationError for missing metadata")
 except ValidationError as e:
-    print("✓ Missing metadata correctly raises ValidationError")
+    print("[OK] Missing metadata correctly raises ValidationError")
 
-print("\nAll tests passed! ✓")
+print("\nAll tests passed! [OK]")

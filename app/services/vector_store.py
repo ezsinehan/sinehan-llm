@@ -108,6 +108,37 @@ def _chunk_to_payload(chunk: Chunk) -> dict:
     }
 
 
+def search(
+    query_vector: List[float],
+    top_k: int = 5,
+    collection_name: str = COLLECTION_NAME,
+) -> List[dict]:
+    """
+    Similarity search: return top-k points closest to query_vector.
+    Each result is a dict with payload (text, doc_id, chunk_index, section_title, url,
+    token_count, source_name, chunk_id) plus "score" (similarity).
+    """
+    client = _get_client()
+    # qdrant-client 1.16+ uses query_points (search was removed)
+    response = client.query_points(
+        collection_name=collection_name,
+        query=query_vector,
+        limit=top_k,
+    )
+    hits = response.points
+    out = []
+    for h in hits:
+        payload = dict(h.payload) if h.payload else {}
+        # Ensure score and any numeric payload fields are native types for JSON.
+        payload["score"] = float(h.score)
+        if "token_count" in payload:
+            payload["token_count"] = int(payload["token_count"])
+        if "chunk_index" in payload:
+            payload["chunk_index"] = int(payload["chunk_index"])
+        out.append(payload)
+    return out
+
+
 def upsert_chunks(
     chunks: List[Chunk],
     vectors: List[List[float]],

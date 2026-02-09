@@ -1,5 +1,5 @@
 # tests/test_vector_store.py
-"""Automated tests for vector_store (step 6). Mocks Qdrant so no live DB needed."""
+"""Automated tests for vector_store (step 6 + step 7 search). Mocks Qdrant so no live DB needed."""
 import sys
 import uuid
 from pathlib import Path
@@ -158,6 +158,57 @@ def test_upsert_chunks_builds_points():
     print("[PASS] upsert_chunks builds correct PointStructs")
 
 
+# --- Step 7: search() ---
+
+
+def test_search_calls_query_points_with_limit():
+    """search() must call client.query_points with query=vector and limit=top_k."""
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.points = []
+    mock_client.query_points.return_value = mock_response
+    with patch.object(vector_store, "_get_client", return_value=mock_client):
+        vector_store.search(query_vector=[0.1] * 384, top_k=7, collection_name="test_coll")
+    mock_client.query_points.assert_called_once()
+    call_kw = mock_client.query_points.call_args[1]
+    assert call_kw["collection_name"] == "test_coll"
+    assert call_kw["query"] == [0.1] * 384
+    assert call_kw["limit"] == 7
+    print("[PASS] search calls query_points with query and limit")
+
+
+def test_search_returns_payload_and_score():
+    """search() returns list of dicts with payload fields + score (native float)."""
+    mock_client = MagicMock()
+    mock_point = MagicMock()
+    mock_point.payload = {
+        "text": "Some chunk text.",
+        "doc_id": "doc1",
+        "chunk_index": 0,
+        "section_title": "Intro",
+        "url": None,
+        "token_count": 50,
+        "source_name": "f.md",
+        "chunk_id": "doc1_0",
+    }
+    mock_point.score = 0.876  # could be numpy float in real client
+    mock_response = MagicMock()
+    mock_response.points = [mock_point]
+    mock_client.query_points.return_value = mock_response
+    with patch.object(vector_store, "_get_client", return_value=mock_client):
+        results = vector_store.search(query_vector=[0.0] * 384, top_k=5)
+    assert len(results) == 1
+    r = results[0]
+    assert r["text"] == "Some chunk text."
+    assert r["doc_id"] == "doc1"
+    assert r["chunk_index"] == 0
+    assert r["score"] == 0.876
+    assert isinstance(r["score"], float)
+    assert isinstance(r["token_count"], int)
+    assert isinstance(r["chunk_index"], int)
+    print("[PASS] search returns payload + score as JSON-safe types")
+
+
 def run_all():
     test_chunk_id_to_point_id_deterministic()
     test_chunk_to_payload_keys()
@@ -167,6 +218,8 @@ def run_all():
     test_ensure_collection_skips_create_when_exists()
     test_delete_by_doc_id_calls_delete_with_filter()
     test_upsert_chunks_builds_points()
+    test_search_calls_query_points_with_limit()
+    test_search_returns_payload_and_score()
     print("\n" + "=" * 50)
     print("All vector_store tests passed.")
     print("=" * 50)

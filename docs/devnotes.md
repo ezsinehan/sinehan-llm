@@ -4,7 +4,7 @@
 4. Chunk + clean text, attach metadata
 5. Embed chunks locally
 6. Store embeddings + chunk text + metadata in the vector DB
-7. Build query endpoint: embed question → vector search top-k
+7. Build query endpoint: embed question → vector search top-k ✓ (POST /query; step7notes.md)
 8. Build answer endpoint: send (question + retrieved chunks) to DeepSeek → get response
 9. Return response + citations (metadata for retrieved chunks)
 10. Add minimal logs/metrics + package (Docker + README + example requests)

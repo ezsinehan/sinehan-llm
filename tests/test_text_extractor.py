@@ -34,7 +34,7 @@ async def test_valid_markdown():
     
     result = await extract_text_from_markdown(mock_file)
     assert result == markdown_content, f"Expected markdown content, got: {result[:50]}..."
-    print("✓ Valid UTF-8 markdown extracted successfully")
+    print("[OK] Valid UTF-8 markdown extracted successfully")
 
 # Test 2: Empty file
 async def test_empty_file():
@@ -45,7 +45,7 @@ async def test_empty_file():
     
     result = await extract_text_from_markdown(mock_file)
     assert result == "", "Empty file should return empty string"
-    print("✓ Empty file handled correctly")
+    print("[OK] Empty file handled correctly")
 
 # Test 3: Markdown with special characters
 async def test_special_characters():
@@ -57,7 +57,7 @@ async def test_special_characters():
     
     result = await extract_text_from_markdown(mock_file)
     assert result == markdown_content, "Special characters should be preserved"
-    print("✓ Special characters and unicode handled correctly")
+    print("[OK] Special characters and unicode handled correctly")
 
 # Test 4: Invalid UTF-8 encoding (should raise ValueError)
 async def test_invalid_utf8():
@@ -74,7 +74,7 @@ async def test_invalid_utf8():
         assert False, "Should have raised ValueError"
     except ValueError as e:
         assert "invalid.bin" in str(e), "Error message should include filename"
-        print("✓ Invalid UTF-8 correctly raises ValueError with filename")
+        print("[OK] Invalid UTF-8 correctly raises ValueError with filename")
 
 # Test 5: Multi-line markdown
 async def test_multiline_markdown():
@@ -96,7 +96,7 @@ This is paragraph two with **bold** and *italic* text.
     result = await extract_text_from_markdown(mock_file)
     assert result == markdown_content, "Multi-line markdown should be preserved"
     assert "\n" in result, "Should contain newlines"
-    print("✓ Multi-line markdown extracted correctly")
+    print("[OK] Multi-line markdown extracted correctly")
 
 # Run all tests
 async def run_all_tests():
@@ -105,7 +105,7 @@ async def run_all_tests():
     await test_special_characters()
     await test_invalid_utf8()
     await test_multiline_markdown()
-    print("\nAll tests passed! ✓")
+    print("\nAll tests passed! [OK]")
 
 # Execute tests
 if __name__ == "__main__":

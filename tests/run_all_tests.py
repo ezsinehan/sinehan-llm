@@ -15,6 +15,7 @@ TEST_FILES = [
     "test_embedder.py",
     "test_text_extractor.py",
     "test_vector_store.py",
+    "test_query_endpoint.py",
 ]
 
 def main():
