@@ -29,4 +29,4 @@ The ingestion endpoint now runs the full pipeline:
 
 **Supported files:** Markdown and any UTF-8 text file. PDF not yet supported (would require a separate extractor).
 
-**How to test:** Use FastAPI docs at `http://localhost:8000/docs` (try the `/ingest` endpoint with a .md file). Or PowerShell: `Invoke-RestMethod -Method Post -Uri http://localhost:8000/ingest -Form @{ file = Get-Item -Path .\sample_doc.md }`. Optional form fields: `doc_id`, `url`.
+**How to test:** Use FastAPI docs at `http://localhost:8000/docs` (try the `/ingest` endpoint with a .md file). Or PowerShell: `Invoke-RestMethod -Method Post -Uri http://localhost:8000/ingest -Form @{ file = Get-Item -Path .\sinehan_rag.md }`. Optional form fields: `doc_id`, `url`.

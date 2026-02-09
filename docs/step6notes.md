@@ -15,7 +15,7 @@ A vector is just a list of numbers. To "find chunks similar to my question" we n
 
 **Three things Qdrant stores per record (it calls each record a "point"):**
 
-1. **ID** – Unique identifier for the point. We need this so we can update or delete a specific chunk (e.g. when re-ingesting a document we delete all points for that doc_id, then add the new ones). We'll use **chunk_id** (e.g. `sample-doc_0`) as the point ID so it's stable and human-readable.
+1. **ID** – Unique identifier for the point. We need this so we can update or delete a specific chunk (e.g. when re-ingesting a document we delete all points for that doc_id, then add the new ones). We'll use **chunk_id** (e.g. `sinehan-rag_0`) as the point ID so it's stable and human-readable.
 
 2. **Vector** – The embedding (list of floats, length = our embedding dimension, 384). This is what gets compared during search. Same dimension as our embedder output.
 
@@ -39,9 +39,9 @@ So step 6 does not chunk or embed; it **takes** chunks and vectors and **writes*
 
 ## Re-ingest: replacing all chunks for a document
 
-We decided (step 4 notes) that doc_id is stable and that when we re-ingest a document we **replace** all chunks for that document. So when we upload "sample-doc" again:
+We decided (step 4 notes) that doc_id is stable and that when we re-ingest a document we **replace** all chunks for that document. So when we upload "sinehan-rag" again:
 
-1. **Delete** every point in the collection whose payload has `doc_id == "sample-doc"`. That clears the old chunks for that doc.
+1. **Delete** every point in the collection whose payload has `doc_id == "sinehan-rag"`. That clears the old chunks for that doc.
 2. **Upsert** the new points (new chunks + new vectors) for that doc.
 
 That way we don't end up with duplicate or stale chunks for the same doc. So step 6 needs two operations we can call: **delete all points for a given doc_id** (filter by payload), and **upsert a batch of points** (id, vector, payload per chunk).
@@ -51,7 +51,7 @@ That way we don't end up with duplicate or stale chunks for the same doc. So ste
 ## Exact shape of what we store (decisions)
 
 - **Collection name** – Fixed name, e.g. `rag_chunks`. Could come from config later; for now a constant is fine.
-- **Point ID** – `chunk.metadata.chunk_id` (e.g. `sample-doc_0`). String. Unique per chunk across the whole app.
+- **Point ID** – `chunk.metadata.chunk_id` (e.g. `sinehan-rag_0`). String. Unique per chunk across the whole app.
 - **Vector** – The corresponding element from `embed_chunks(chunks)`; length must equal collection's vector size (384).
 - **Payload** – A dict we can build from each chunk, e.g.:
   - `text` → chunk.text

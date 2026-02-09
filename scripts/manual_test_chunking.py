@@ -23,12 +23,12 @@ from app.services.chunker import chunk_markdown, MAX_TOKENS, MIN_TOKENS
 
 def main():
     parser = argparse.ArgumentParser(description="Run clean -> chunk -> embed on a markdown file.")
-    parser.add_argument("md_file", nargs="?", default=None, help="Path to .md file (default: sample_doc.md)")
+    parser.add_argument("md_file", nargs="?", default=None, help="Path to .md file (default: sinehan_rag.md)")
     parser.add_argument("--no-embed", action="store_true", help="Skip embedding step (chunk only)")
     parser.add_argument("--no-store", action="store_true", help="Skip storing in Qdrant (only when embedding)")
     args = parser.parse_args()
 
-    md_path = Path(args.md_file) if args.md_file else project_root / "sample_doc.md"
+    md_path = Path(args.md_file) if args.md_file else project_root / "sinehan_rag.md"
 
     if not md_path.exists():
         print(f"File not found: {md_path}")
@@ -36,9 +36,9 @@ def main():
 
     raw = md_path.read_text(encoding="utf-8")
     cleaned = clean_text(raw)
-    doc_id = "sample-doc"
+    doc_id = "sinehan-rag"
     sourcename = md_path.name
-    url = "https://example.com/sample-doc"
+    url = "https://example.com/sinehan-rag"
 
     chunks = chunk_markdown(cleaned, doc_id=doc_id, sourcename=sourcename, url=url)
 

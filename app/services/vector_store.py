@@ -28,7 +28,7 @@ _NAMESPACE_CHUNK_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "sinehanllm.rag.chunk_id")
 
 
 def _chunk_id_to_point_id(chunk_id: str) -> uuid.UUID:
-    """Map chunk_id (e.g. sample-doc_0) to a deterministic UUID for Qdrant point ID."""
+    """Map chunk_id (e.g. sinehan-rag_0) to a deterministic UUID for Qdrant point ID."""
     return uuid.uuid5(_NAMESPACE_CHUNK_ID, chunk_id)
 
 

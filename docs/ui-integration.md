@@ -35,16 +35,16 @@ CORS is enabled so the browser can call the API from another origin (e.g. your U
   "answer": "The model's answer text...",
   "citations": [
     {
-      "chunk_id": "sample-doc_0",
-      "doc_id": "sample-doc",
+      "chunk_id": "sinehan-rag_0",
+      "doc_id": "sinehan-rag",
       "section_title": "Introduction",
       "url": "https://example.com/doc",
-      "source_name": "sample_doc.md"
+      "source_name": "sinehan_rag.md"
     }
   ]
 }
 ```
-`url` may be `null`. Show citations under the answer (e.g. "Sources: Introduction (sample_doc.md), ...").
+`url` may be `null`. Show citations under the answer (e.g. "Sources: Introduction (sinehan_rag.md), ...").
 
 ---
 

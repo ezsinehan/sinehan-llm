@@ -48,7 +48,10 @@ Answer (based only on the context above):"""
     model = _get_model()
     response = model.generate_content(
         prompt,
-        generation_config={"temperature": 0.2, "max_output_tokens": 1024},
+        generation_config={
+            "temperature": 0.2,
+            "max_output_tokens": settings.gemini_max_output_tokens,
+        },
     )
     try:
         text = response.text if hasattr(response, "text") else None

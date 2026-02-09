@@ -100,7 +100,7 @@ Next step is working on implementing chunks that are too small most be grouped.
 ---
 How to run the manual test (chunking + optional embedding)
 - From project root, with venv activated: `python scripts/manual_test_chunking.py`
-- Uses `sample_doc.md` by default. To use another file: `python scripts/manual_test_chunking.py path/to/your.md`
+- Uses `sinehan_rag.md` by default. To use another file: `python scripts/manual_test_chunking.py path/to/your.md`
 - By default runs full pipeline: clean text -> chunk -> embed. Output: chunk summary by section, full chunk text, then embedding summary and writes `manual_test_embeddings.json` in project root (chunk_id, section_title, text_preview, embedding vector per chunk).
 - To run chunking only (no embedding): `python scripts/manual_test_chunking.py --no-embed`
 - Requires `sentence-transformers` for embedding: `pip install sentence-transformers`
