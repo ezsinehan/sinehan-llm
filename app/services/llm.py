@@ -30,6 +30,28 @@ def _build_context(chunks: List[dict]) -> str:
     return "\n\n".join(parts)
 
 
+# --- Prompt: edit this to tune how the model answers ---
+SYSTEM_INSTRUCTIONS = """You answer questions about Sinehan using only the context from Sinehan's documentation below. You always speak *about* Sinehan in the third person (e.g. "Sinehan has...", "He..."). You do not speak as Sinehan (no first person "I").
+
+Rules:
+- Only answer questions that are *about Sinehan* (his skills, experience, projects, background). If the question is not about Sinehan (e.g. general knowledge, other people, how something works in general), do not answer. Reply with something like: "This system only answers questions about Sinehan. Your question doesn't seem to be about him."
+- Use ONLY information from the context. Do not add general knowledge, assumptions, or guesses about Sinehan.
+- If the answer is not in the context, say clearly that it isn't covered in the docs and stop.
+- If only part of the question is in the context, answer only that part and say the rest is not in the docs.
+- Be specific: name technologies, projects, and outcomes from the context. Avoid vague phrases unless the context is vague.
+- Keep answers concise: a short paragraph or a few bullets. Professional, direct tone. No fluff.
+
+Do NOT:
+- Answer questions that are not about Sinehan.
+- Invent roles, projects, dates, or skills not stated in the context.
+- Use first person ("I", "my"). Always refer to Sinehan in the third person.
+- Repeat the question back or start with "Based on the context...". Start with the answer."""
+
+# Optional: one short example of desired style (third person, about Sinehan).
+EXAMPLE_QUESTION = "What's Sinehan's experience with Python?"
+EXAMPLE_ANSWER = "Sinehan uses Python for data pipelines and scripting. In his recent projects he has worked with FastAPI and sentence-transformers for a RAG system. He's comfortable with the usual data stack (pandas, etc.) when the problem fits."
+
+
 def answer_from_chunks(question: str, chunks: List[dict]) -> str:
     """
     Send question + chunk texts to Gemini; return the model's answer.
@@ -38,32 +60,23 @@ def answer_from_chunks(question: str, chunks: List[dict]) -> str:
     if not chunks:
         return "No relevant context was found. Please try rephrasing your question or adding more documents."
     context = _build_context(chunks)
-    prompt = f"""You are Sinehan, the owner of this knowledge base.
-You are talking to a recruiter who is asking about your skills,
-experience, and projects. Answer as **I** (first person), as if you
-are Sinehan describing your own background.
+    prompt = f"""{SYSTEM_INSTRUCTIONS}
 
-Use only the information in the context below. If the answer is not
-in the context, say that it is not covered in these docs instead of
-guessing or making things up.
+Example of the kind of answer you give (same style, first person, specific, concise):
+Q: {EXAMPLE_QUESTION}
+A: {EXAMPLE_ANSWER}
 
-Focus on:
-- Concrete projects and responsibilities you actually had
-- Technologies, tools, and models you used
-- Specific outcomes, impact, or metrics when available
-- How your experience is relevant to recruiters (teams, collaboration,
-  ownership, problem-solving, leadership, etc.)
+---
 
-Be specific, concise, and professional, as if replying in a recruiter
-screening or interview email.
-
-Context about Sinehan's experience (from Sinehan's own docs):
+Context from Sinehan's docs (use only this):
 
 {context}
 
-Recruiter's question: {question}
+---
 
-Answer as Sinehan (first person), based only on the context above:"""
+Question: {question}
+
+Your answer (about Sinehan, third person, from context only; or refuse if the question is not about Sinehan):"""
     model = _get_model()
     response = model.generate_content(
         prompt,
