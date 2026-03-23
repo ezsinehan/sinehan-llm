@@ -24,3 +24,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# Qdrant local storage
+qdrant_storage/
+
+# Generated test artifacts
+manual_test_embeddings.json
+
