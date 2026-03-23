@@ -33,11 +33,11 @@ def _chunk_id_to_point_id(chunk_id: str) -> uuid.UUID:
 
 
 def _get_client() -> QdrantClient:
-    """Return a Qdrant client using settings (url + api_key)."""
-    return QdrantClient(
-        url=settings.qdrant_url,
-        api_key=settings.qdrant_api_key,
-    )
+    """Return a Qdrant client using settings (url + optional api_key)."""
+    kwargs = {"url": settings.qdrant_url}
+    if settings.qdrant_api_key:
+        kwargs["api_key"] = settings.qdrant_api_key
+    return QdrantClient(**kwargs)
 
 
 def ensure_collection(collection_name: str = COLLECTION_NAME) -> None:
