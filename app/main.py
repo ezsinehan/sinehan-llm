@@ -1,55 +1,57 @@
-# FastAPI is the main class to create the app instance
-# UploadFile  type for upload files
-# File(...) dependencies to mark a parameter as a file upload
-import re
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-# Creates the app instance, app is used to register routes and configure the API
+from app.rate_limit import limiter, ANSWER_LIMIT, INFO_LIMIT
+
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS: allow your UI (e.g. localhost:3000 or localhost:5173) to call this API from the browser
+# CORS: allow your UI (e.g. Vite on :5173) to call this API from the browser
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://sinehan.dev", "https://www.sinehan.dev"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://sinehan.dev",
+        "https://www.sinehan.dev",
+    ],
     allow_credentials=True,
-    allow_methods=["POST"],
+    allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
 
 
-# --- Step 7: Query (embed question → vector search top-k) ---
+# --- Answer (question + chunks → LLM) + citations ---
 
-class QueryRequest(BaseModel):
-    question: str
-    top_k: int = 5
+MAX_QUESTION_LENGTH = 500
+MAX_TOP_K = 10
 
-
-class QueryResponse(BaseModel):
-    chunks: list[dict]  # each: text, doc_id, chunk_index, section_title, url, token_count, source_name, chunk_id, score
-
-
-@app.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest):
-    """Embed the question, search Qdrant for top-k similar chunks, return chunks with metadata and score."""
-    from app.services.embedder import embed_text
-    from app.services.vector_store import search
-
-    try:
-        query_vector = embed_text(request.question)
-        chunks = search(query_vector=query_vector, top_k=request.top_k)
-        return QueryResponse(chunks=chunks)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# --- Step 8 & 9: Answer (question + chunks → LLM) + citations ---
 
 class AnswerRequest(BaseModel):
     question: str
     top_k: int = 5
+
+    @field_validator("question")
+    @classmethod
+    def question_not_empty_or_too_long(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("question must not be empty")
+        if len(v) > MAX_QUESTION_LENGTH:
+            raise ValueError(f"question must be {MAX_QUESTION_LENGTH} characters or fewer")
+        return v
+
+    @field_validator("top_k")
+    @classmethod
+    def top_k_in_range(cls, v: int) -> int:
+        if v < 1 or v > MAX_TOP_K:
+            raise ValueError(f"top_k must be between 1 and {MAX_TOP_K}")
+        return v
 
 
 def _chunk_to_citation(c: dict) -> dict:
@@ -68,93 +70,78 @@ class AnswerResponse(BaseModel):
     citations: list[dict]  # each: chunk_id, doc_id, section_title, url, source_name
 
 
+@app.get("/info")
+@limiter.limit(INFO_LIMIT)
+async def info(request: Request):
+    """Return technical details about the RAG setup: stack info, document stats, service health."""
+    from app.config import settings
+    from app.services.vector_store import _get_client, COLLECTION_NAME
+
+    # Stack info
+    stack = {
+        "llm_model": settings.ollama_model_name,
+        "embedding_model": settings.embedding_model_name,
+        "embedding_dimension": settings.embedding_dimension,
+        "vector_db": "Qdrant",
+    }
+
+    # Document/chunk stats from Qdrant
+    stats = {"total_chunks": 0, "documents": []}
+    qdrant_ok = False
+    try:
+        client = _get_client()
+        collection = client.get_collection(COLLECTION_NAME)
+        stats["total_chunks"] = collection.points_count
+        # Scroll all points to extract unique doc_ids
+        all_points, _ = client.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=10000,
+            with_payload=["doc_id", "source_name"],
+            with_vectors=False,
+        )
+        doc_map = {}
+        for p in all_points:
+            doc_id = p.payload.get("doc_id", "unknown")
+            if doc_id not in doc_map:
+                doc_map[doc_id] = {"doc_id": doc_id, "source_name": p.payload.get("source_name", ""), "chunk_count": 0}
+            doc_map[doc_id]["chunk_count"] += 1
+        stats["documents"] = list(doc_map.values())
+        qdrant_ok = True
+    except Exception:
+        pass
+
+    # Ollama health check
+    ollama_ok = False
+    try:
+        import httpx
+        resp = httpx.get(f"{settings.ollama_url}/api/tags", timeout=3)
+        ollama_ok = resp.status_code == 200
+    except Exception:
+        pass
+
+    return {
+        "stack": stack,
+        "stats": stats,
+        "health": {
+            "qdrant": qdrant_ok,
+            "ollama": ollama_ok,
+        },
+    }
+
+
 @app.post("/answer", response_model=AnswerResponse)
-async def answer(request: AnswerRequest):
+@limiter.limit(ANSWER_LIMIT)
+async def answer(request: Request, body: AnswerRequest):
     """Run query (embed + search), then send question + chunks to Ollama; return answer and citations."""
     from app.services.embedder import embed_text
     from app.services.vector_store import search
     from app.services.llm import answer_from_chunks
 
     try:
-        query_vector = embed_text(request.question)
-        chunks = search(query_vector=query_vector, top_k=request.top_k)
-        answer_text = answer_from_chunks(request.question, chunks)
+        query_vector = embed_text(body.question)
+        chunks = search(query_vector=query_vector, top_k=body.top_k)
+        answer_text = answer_from_chunks(body.question, chunks)
         citations = [_chunk_to_citation(c) for c in chunks]
         return AnswerResponse(answer=answer_text, citations=citations)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# --- Step 3: Ingest (upload → extract → clean → chunk → embed → store) ---
-
-
-def _doc_id_from_filename(filename: str) -> str:
-    """Derive a safe doc_id from filename (e.g. 'My Doc.md' -> 'my-doc')."""
-    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
-    stem = stem.strip() or "doc"
-    # Lowercase, replace non-alphanumeric with dash, collapse dashes
-    safe = re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-")
-    return safe or "doc"
-
-
-class IngestResponse(BaseModel):
-    status: str
-    doc_id: str
-    source_name: str
-    chunks_stored: int
-
-
-@app.post("/ingest", response_model=IngestResponse)
-async def ingest_document(
-    file: UploadFile = File(...),
-    doc_id: str | None = Form(None),
-    url: str | None = Form(None),
-):
-    """
-    Upload a markdown or text file: extract text, clean, chunk, embed, and store in Qdrant.
-    Optional form fields: doc_id (default: from filename), url (optional link for citations).
-    Re-ingesting the same doc_id replaces existing chunks for that doc.
-    """
-    from app.services.text_extractor import extract_text_from_markdown
-    from app.services.text_cleaner import clean_text
-    from app.services.chunker import chunk_markdown
-    from app.services.embedder import embed_chunks
-    from app.services.vector_store import (
-        COLLECTION_NAME,
-        ensure_collection,
-        delete_by_doc_id,
-        upsert_chunks,
-    )
-
-    try:
-        raw = await extract_text_from_markdown(file)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    cleaned = clean_text(raw)
-    resolved_doc_id = doc_id if doc_id and doc_id.strip() else _doc_id_from_filename(file.filename or "doc.md")
-    sourcename = file.filename or "document.md"
-
-    chunks = chunk_markdown(cleaned, doc_id=resolved_doc_id, sourcename=sourcename, url=url or None)
-    if not chunks:
-        return IngestResponse(
-            status="ok",
-            doc_id=resolved_doc_id,
-            source_name=sourcename,
-            chunks_stored=0,
-        )
-
-    try:
-        vectors = embed_chunks(chunks)
-        ensure_collection(COLLECTION_NAME)
-        delete_by_doc_id(resolved_doc_id, COLLECTION_NAME)
-        upsert_chunks(chunks, vectors, COLLECTION_NAME)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    return IngestResponse(
-        status="ok",
-        doc_id=resolved_doc_id,
-        source_name=sourcename,
-        chunks_stored=len(chunks),
-    )

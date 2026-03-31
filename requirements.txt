@@ -28,6 +28,7 @@ networkx==3.6.1
 numpy==2.2.6
 openai
 rich
+slowapi
 
 packaging==26.0
 portalocker==3.2.0
