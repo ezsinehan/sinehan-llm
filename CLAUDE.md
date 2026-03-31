@@ -65,7 +65,7 @@ Anything else typed is sent to the RAG pipeline as a question. Calls services di
 - `POST /answer` — Full RAG: returns `{ answer, citations }`.
 
 **Configuration (`app/config.py`):** Pydantic Settings reads from `.env`:
-- `OLLAMA_URL` (default: `http://localhost:11434`), `OLLAMA_MODEL_NAME` (default: `qwen2.5:7b`), `OLLAMA_MAX_TOKENS`
+- `OLLAMA_URL` (default: `http://localhost:11434`), `OLLAMA_MODEL_NAME` (currently `llama3.2:3b` in `.env`), `OLLAMA_MAX_TOKENS`
 - `QDRANT_URL`, `QDRANT_API_KEY` (optional, leave empty for local Docker)
 - `EMBEDDING_MODEL_NAME`, `EMBEDDING_DIMENSION`
 
@@ -83,4 +83,22 @@ Tests use plain Python scripts with assertions (no pytest). `tests/run_all_tests
 
 ## Deployment
 
-Python 3.11.9 (see `runtime.txt`). Target: self-hosted VPS with Qdrant + Ollama running as services, FastAPI served via uvicorn behind a reverse proxy. Cloudflare Tunnel used to expose the local dev instance to the website during development.
+Python 3.11.9 (see `runtime.txt`). Target: self-hosted VPS with Qdrant + Ollama running as services, FastAPI served via uvicorn behind a reverse proxy.
+
+### Cloudflare Tunnel (dev)
+
+Exposes the local FastAPI server to `api.sinehan.dev` via a named tunnel.
+
+- **Config:** `.cloudflared/config.yml` — routes `api.sinehan.dev` → `http://localhost:8000`, catch-all → 404
+- **Tunnel ID:** `0de7fad1-b29c-471e-997a-e6b7da4e57c5`
+- **Credentials:** stored in `~/.cloudflared/` (not in repo)
+
+```bash
+# Route DNS (one-time)
+cloudflared tunnel route dns api api.sinehan.dev
+
+# Run the tunnel (requires uvicorn running on :8000)
+cloudflared tunnel run api
+```
+
+Domain is on name.com with Cloudflare DNS protection.

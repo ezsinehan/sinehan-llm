@@ -10,10 +10,9 @@ from app.config import settings
 
 # Test that settings loaded correctly
 print("Config loaded successfully!")
-print(f"Gemini API Key: {settings.gemini_api_key[:10]}..." if len(settings.gemini_api_key) > 10 else "  API key too short")
-print(f"Gemini Model: {settings.gemini_model_name}")
+print(f"Ollama URL: {settings.ollama_url}")
+print(f"Ollama Model: {settings.ollama_model_name}")
 print(f"Qdrant URL: {settings.qdrant_url}")
-print(f"Qdrant API Key: {settings.qdrant_api_key[:10]}..." if len(settings.qdrant_api_key) > 10 else "  API key too short")
+print(f"Qdrant API Key: {settings.qdrant_api_key[:10]}..." if len(settings.qdrant_api_key) > 10 else "  Qdrant API key empty (local Docker)")
 print(f"Embedding Model: {settings.embedding_model_name}")
 print(f"Embedding Dimension: {settings.embedding_dimension} (type: {type(settings.embedding_dimension).__name__})")
-

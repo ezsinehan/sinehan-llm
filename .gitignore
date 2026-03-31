@@ -27,6 +27,9 @@ Thumbs.db
 # Qdrant local storage
 qdrant_storage/
 
+# Cloudflare Tunnel
+.cloudflared/
+
 # Generated test artifacts
 manual_test_embeddings.json
 
