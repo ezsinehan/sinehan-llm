@@ -13,10 +13,10 @@ app = FastAPI()
 # CORS: allow your UI (e.g. localhost:3000 or localhost:5173) to call this API from the browser
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # in production, set to your UI origin(s), e.g. ["https://your-app.com"]
+    allow_origins=["https://sinehan.dev", "https://www.sinehan.dev"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -34,7 +34,6 @@ class QueryResponse(BaseModel):
 @app.post("/query", response_model=QueryResponse)
 async def query(request: QueryRequest):
     """Embed the question, search Qdrant for top-k similar chunks, return chunks with metadata and score."""
-    from fastapi import HTTPException
     from app.services.embedder import embed_text
     from app.services.vector_store import search
 
@@ -71,8 +70,7 @@ class AnswerResponse(BaseModel):
 
 @app.post("/answer", response_model=AnswerResponse)
 async def answer(request: AnswerRequest):
-    """Run query (embed + search), then send question + chunks to Gemini; return answer and citations."""
-    from fastapi import HTTPException
+    """Run query (embed + search), then send question + chunks to Ollama; return answer and citations."""
     from app.services.embedder import embed_text
     from app.services.vector_store import search
     from app.services.llm import answer_from_chunks

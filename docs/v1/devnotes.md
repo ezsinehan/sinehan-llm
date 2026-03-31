@@ -21,3 +21,30 @@ Learn more in the docs
 
 
 NVM Im transfering the domain to name.com!
+
+
+PS C:\Users\ezsin\Desktop\sinehanllm> cloudflared tunnel route dns api api.sinehan.dev
+2026-03-31T21:40:14Z INF api.sinehan.dev is already configured to route to your tunnel tunnelID=0de7fad1-b29c-471e-997a-e6b7da4e57c5
+
+Okay it seems pretty easy to set up and it seems its running on a local port and just being exposed with cloudflare tunnel not much setup just run a couple commands and set up the config file
+
+possible production checklist
+  Security:
+  - CORS — restricted to sinehan.dev origins, POST only
+  - Rate limiting — add middleware to prevent abuse (e.g., slowapi)
+  - Input validation — max question length on /answer and /query
+  - File upload limits — max file size on /ingest (or disable it publicly)
+  - Qdrant auth — set QDRANT_API_KEY if Qdrant port is exposed
+
+  Reliability:
+  - Cloudflared as a Windows service — so the tunnel survives reboots
+  - Docker restart policy — docker update --restart unless-stopped qdrant
+  - Ollama auto-start — verify it's set to launch on boot
+  - Health check endpoint — add a GET /health that pings Qdrant + Ollama
+
+  Operational:
+  - HTTPS only — tunnel handles this, but verify no HTTP fallback
+  - Logging — structured request logging for debugging
+  - .env not in git — verify it stays out of version control
+
+  

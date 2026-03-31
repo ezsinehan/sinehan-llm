@@ -1,6 +1,6 @@
 # Sinehan RAG
 
-Sinehan RAG is a retrieval-augmented generation (RAG) project. It ingests markdown documentation, chunks it with structure-aware rules, embeds chunks locally, stores them in a vector database (Qdrant), and answers user questions by retrieving the most relevant chunks and sending them with the question to an LLM (Gemini). You control the docs, so chunking is deterministic and optimized for your headings and paragraph structure. The stack is: **FastAPI** (API server), **sentence-transformers** with **BAAI/bge-small-en-v1.5** (local embeddings, 384 dimensions), **Qdrant Cloud** (vector store), and **Google Gemini** (hosted LLM for answers). There is no LangChain; the RAG flow (chunk, embed, search, prompt, generate) is explicit.
+Sinehan RAG is a retrieval-augmented generation (RAG) project. It ingests markdown documentation, chunks it with structure-aware rules, embeds chunks locally, stores them in a vector database (Qdrant), and answers user questions by retrieving the most relevant chunks and sending them with the question to a local LLM (Ollama). You control the docs, so chunking is deterministic and optimized for your headings and paragraph structure. The stack is: **FastAPI** (API server), **sentence-transformers** with **BAAI/bge-small-en-v1.5** (local embeddings, 384 dimensions), **local Qdrant** (Docker, vector store), and **Ollama** (local LLM for answers). There is no LangChain; the RAG flow (chunk, embed, search, prompt, generate) is explicit.
 
 ---
 
@@ -22,13 +22,14 @@ You can pass an optional URL when ingesting so that citations in answers link ba
 
 All configuration is via environment variables (e.g. a `.env` file in the project root). Pydantic Settings loads them.
 
-**LLM (Gemini):**
-- **GEMINI_API_KEY** (required): Your Google AI / Gemini API key.
-- **GEMINI_MODEL_NAME** (optional, default `gemini-2.5-flash`): Model used for generating answers. Supported values include `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.0-flash`. Do not use deprecated or experimental IDs like `gemini-2.0-flash-exp` or `gemini-1.5-flash` (they may return 404).
+**LLM (Ollama):**
+- **OLLAMA_URL** (optional, default `http://localhost:11434`): URL where Ollama is running.
+- **OLLAMA_MODEL_NAME** (optional, default `qwen2.5:7b`): Model used for generating answers. Pull it first with `ollama pull <model>`.
+- **OLLAMA_MAX_TOKENS** (optional, default `8192`): Max tokens for LLM responses.
 
-**Vector DB (Qdrant Cloud):**
-- **QDRANT_URL** (required): Your Qdrant cluster URL (e.g. `https://xxx.us-east4-0.gcp.cloud.qdrant.io`).
-- **QDRANT_API_KEY** (required): API key for Qdrant.
+**Vector DB (local Qdrant via Docker):**
+- **QDRANT_URL** (required): Your Qdrant instance URL (e.g. `http://localhost:6333`).
+- **QDRANT_API_KEY** (optional): Leave empty for local Docker instances.
 
 **Embedding model:**
 - **EMBEDDING_MODEL_NAME** (required): Model name for sentence-transformers; default is `BAAI/bge-small-en-v1.5`.
@@ -40,7 +41,7 @@ The chunker uses fixed thresholds you can rely on when writing docs: **MAX_TOKEN
 
 ## API Overview
 
-The API has three main HTTP endpoints. All are POST. The server runs with FastAPI and CORS is enabled so a frontend (e.g. React on Netlify) can call it from the browser.
+The API has three main HTTP endpoints. All are POST. The server runs with FastAPI and CORS is configured for `sinehan.dev`.
 
 ### POST /ingest
 
@@ -73,7 +74,7 @@ Ask a question and get an LLM-generated answer plus citations (the main RAG endp
 - **Body (JSON):** `{ "question": "Your question here.", "top_k": 5 }`. `top_k` is optional (default 5).
 - **Response (JSON):** `{ "answer": "The model's answer text...", "citations": [ { "chunk_id", "doc_id", "section_title", "url", "source_name" }, ... ] }`. Citations are in the same order as the retrieved chunks; each citation does not include the full chunk text, only metadata for display and linking. `url` may be null.
 
-Flow: embed question → search Qdrant for top-k chunks → build a prompt with question and chunk texts (numbered by section) → call Gemini → return the answer and the list of citations. The LLM is instructed to answer only from the provided context and to say so if the answer is not in the context.
+Flow: embed question → search Qdrant for top-k chunks → build a prompt with question and chunk texts (numbered by section) → call Ollama → return the answer and the list of citations. The LLM is instructed to answer only from the provided context and to say so if the answer is not in the context.
 
 ---
 
@@ -111,7 +112,7 @@ From the project root with the venv activated:
 
 - **manual_test_chunking.py:** Runs the full pipeline (clean → chunk → embed → store) on a markdown file. Default file is `sinehan_rag.md`; default doc_id is `sinehan-rag`. Usage: `python scripts/manual_test_chunking.py` or `python scripts/manual_test_chunking.py path/to/file.md`. Flags: `--no-embed` (chunk only), `--no-store` (embed but do not write to Qdrant).
 - **manual_test_query.py:** Calls POST /query and prints the retrieved chunks. Requires the server and Qdrant to have data. Usage: `python scripts/manual_test_query.py` or with a question and `--top-k N`.
-- **manual_test_answer.py:** Calls POST /answer and prints the answer and citations. Requires the server, Qdrant data, and Gemini config. Usage: `python scripts/manual_test_answer.py` or with a question and `--top-k N`.
+- **manual_test_answer.py:** Calls POST /answer and prints the answer and citations. Requires the server, Qdrant data, and Ollama running. Usage: `python scripts/manual_test_answer.py` or with a question and `--top-k N`.
 
 ---
 
@@ -123,4 +124,4 @@ Use clear `##` headings for each major section. Keep paragraphs under roughly 60
 
 ## Summary for the LLM
 
-Sinehan RAG is a RAG API: FastAPI + local embeddings (bge-small-en-v1.5, 384d) + Qdrant + Gemini. Ingest markdown via POST /ingest (multipart: file, optional doc_id and url). Ask questions via POST /answer (JSON: question, optional top_k); response is answer text plus citations (chunk_id, doc_id, section_title, url, source_name). POST /query returns top-k chunks without calling the LLM. Chunking is structure-aware: split on `##`, then by paragraph, then by sentence/list; merge chunks under 100 tokens within the same section. Config: GEMINI_API_KEY, GEMINI_MODEL_NAME, QDRANT_URL, QDRANT_API_KEY, EMBEDDING_MODEL_NAME, EMBEDDING_DIMENSION. Default doc is sinehan_rag.md with doc_id sinehan-rag.
+Sinehan RAG is a RAG API: FastAPI + local embeddings (bge-small-en-v1.5, 384d) + local Qdrant (Docker) + Ollama (local LLM). Ingest markdown via POST /ingest (multipart: file, optional doc_id and url). Ask questions via POST /answer (JSON: question, optional top_k); response is answer text plus citations (chunk_id, doc_id, section_title, url, source_name). POST /query returns top-k chunks without calling the LLM. Chunking is structure-aware: split on `##`, then by paragraph, then by sentence/list; merge chunks under 100 tokens within the same section. Config: OLLAMA_URL, OLLAMA_MODEL_NAME, QDRANT_URL, QDRANT_API_KEY (optional), EMBEDDING_MODEL_NAME, EMBEDDING_DIMENSION. Default doc is sinehan_rag.md with doc_id sinehan-rag.

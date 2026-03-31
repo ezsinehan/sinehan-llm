@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/ezsin/Desktop/sinehanllm -type d -not -path */__pycache__)",
+      "Bash(find /c/Users/ezsin/Desktop/sinehanllm/app/services -name \"*.py\" -exec wc -l {} +)",
+      "Bash(./venv/Scripts/python.exe tests/test_config.py)",
+      "Bash(./venv/Scripts/python.exe tests/test_llm.py)"
+    ]
+  }
+}
