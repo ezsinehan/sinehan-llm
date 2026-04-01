@@ -144,4 +144,5 @@ async def answer(request: Request, body: AnswerRequest):
         citations = [_chunk_to_citation(c) for c in chunks]
         return AnswerResponse(answer=answer_text, citations=citations)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[/answer error] {e}")
+        raise HTTPException(status_code=500, detail="System is currently unavailable. Please try again later.")

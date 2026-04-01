@@ -47,3 +47,9 @@ possible production checklist
   - Logging — structured request logging for debugging
   - .env not in git — verify it stays out of version control
 
+A lot of junk BUT THIS IS IMPORTANT
+
+Securing my system:
+1. I added rate limiting so load abuse couldn't occur there also exists cors restrictions which only block browser access not stopping curls or postman use, but rate limiting should be enough to avoid abuse
+2. Length Input validation, I don't allow empty or long inputs to overload the system, I don't worry about prompt injection as this isn't a secruity risk as the documents are not secure but maybe in the future for quality
+3. Qdrant risk -> Qdrant was listening on 0.0.0.0:6333 which means any device on the network could read chunks delete inject, basically full admin access, not that big of deal since random internet attackers probably couldnt reach it, basically rebinded it to localhost only same with ollama
