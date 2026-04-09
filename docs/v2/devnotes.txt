@@ -1,1 +1,4 @@
 herro! ok so the llm is slow is the main problem right now, text now streams and it connects to the ui not sure if in production butttt soon!
+
+ok the llm is still slow no ui visualizers or stack modifiers or prompt testing or docs and moreeeee, 
+i think most importantly is getting to a more working system, i will try to mess with prompting next
