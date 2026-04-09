@@ -55,14 +55,19 @@ Anything else typed is sent to the RAG pipeline as a question. Calls services di
 - `chunker.py` — 4-step markdown chunking: (1) split by `##` headings, (2) split large sections by paragraphs (>600 tokens), (3) split by sentences/list items, (4) merge chunks <100 tokens with neighbors in same section. Content before the first `##` becomes "Introduction".
 - `embedder.py` — Local embeddings via `sentence-transformers` (`BAAI/bge-small-en-v1.5`, 384-dim). Embeds as `"{section_title}\n\n{chunk_text}"`.
 - `vector_store.py` — Qdrant client (local Docker); stores/retrieves chunks with metadata. `qdrant_api_key` is optional (empty = no auth, used for local instances).
-- `llm.py` — Ollama integration via OpenAI-compatible API; uses low temperature (0.2), enforces third-person answers about Sinehan, refuses off-topic questions.
+- `llm.py` — Ollama integration via OpenAI-compatible API. Prompting is externalized to `prompts.yaml` (project root). LLM roleplays as Sinehan (first person).
 - `text_cleaner.py` — Normalizes whitespace/newlines before chunking.
 - `text_extractor.py` — Reads UTF-8 text from FastAPI `UploadFile`.
 
 **API endpoints (`app/main.py`):**
-- `POST /ingest` — Upload a markdown/text file; optional `doc_id`, `url` params.
-- `POST /query` — Semantic search; returns top-k chunks with scores.
-- `POST /answer` — Full RAG: returns `{ answer, citations }`.
+- `GET /info` — Returns stack info, document stats, and service health (Qdrant/Ollama).
+- `POST /answer` — Full RAG: returns `{ answer, citations }`. Input validated (question max 500 chars, top_k 1–10).
+- `POST /answer/stream` — SSE streaming with real phase events: `{"phase": "embedding"}` → `{"phase": "searching"}` → `{"phase": "generating"}` → `{"token": "..."}` per token → `{"citations": [...]}` → `[DONE]`. Frontend falls back to `/answer` if this returns non-200.
+- `GET /prompts` — Returns current prompt config (`system`, `user_template`, `no_context`, `temperature`) from `prompts.yaml`.
+
+Ingest and query endpoints are not exposed on the API — use the CLI for ingestion.
+
+**Prompt configuration (`prompts.yaml`):** All LLM prompting lives here — `system` (persona), `user` (template with `{context}`/`{question}` placeholders), `no_context` (fallback), `temperature`. Editable without code changes.
 
 **Configuration (`app/config.py`):** Pydantic Settings reads from `.env`:
 - `OLLAMA_URL` (default: `http://localhost:11434`), `OLLAMA_MODEL_NAME` (currently `llama3.2:3b` in `.env`), `OLLAMA_MAX_TOKENS`
@@ -93,12 +98,21 @@ Exposes the local FastAPI server to `api.sinehan.dev` via a named tunnel.
 - **Tunnel ID:** `0de7fad1-b29c-471e-997a-e6b7da4e57c5`
 - **Credentials:** stored in `~/.cloudflared/` (not in repo)
 
-```bash
+```powershell
+# Start everything (Qdrant + uvicorn + tunnel) in one command
+.\run_tunnel.ps1
+
 # Route DNS (one-time)
 cloudflared tunnel route dns api api.sinehan.dev
-
-# Run the tunnel (requires uvicorn running on :8000)
-cloudflared tunnel run api
 ```
 
+`run_tunnel.ps1` activates the venv, starts the Qdrant Docker container (if not running), launches uvicorn, and starts the Cloudflare tunnel. Ctrl+C stops all processes.
+
 Domain is on name.com with Cloudflare DNS protection.
+
+### Security
+
+- Rate limiting via `slowapi` (configured in `app/rate_limit.py`)
+- Input validation on `/answer` (question length, top_k range)
+- Error messages are sanitized — no internal details exposed to clients
+- CORS restricted to `localhost:5173` and `sinehan.dev`

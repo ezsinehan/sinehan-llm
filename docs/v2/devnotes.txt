@@ -1,0 +1,1 @@
+herro! ok so the llm is slow is the main problem right now, text now streams and it connects to the ui not sure if in production butttt soon!

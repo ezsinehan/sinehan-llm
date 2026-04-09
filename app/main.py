@@ -1,5 +1,8 @@
+import json
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -146,3 +149,48 @@ async def answer(request: Request, body: AnswerRequest):
     except Exception as e:
         print(f"[/answer error] {e}")
         raise HTTPException(status_code=500, detail="System is currently unavailable. Please try again later.")
+
+
+@app.post("/answer/stream")
+@limiter.limit(ANSWER_LIMIT)
+async def answer_stream(request: Request, body: AnswerRequest):
+    """SSE streaming variant of /answer. Sends real phase events, streams tokens, then citations."""
+    def event_stream():
+        try:
+            from app.services.embedder import embed_text
+            from app.services.vector_store import search
+            from app.services.llm import stream_answer_from_chunks
+
+            yield f"data: {json.dumps({'phase': 'embedding'})}\n\n"
+            query_vector = embed_text(body.question)
+
+            yield f"data: {json.dumps({'phase': 'searching'})}\n\n"
+            chunks = search(query_vector=query_vector, top_k=body.top_k)
+            citations = [_chunk_to_citation(c) for c in chunks]
+
+            yield f"data: {json.dumps({'phase': 'generating'})}\n\n"
+            for token in stream_answer_from_chunks(body.question, chunks):
+                yield f"data: {json.dumps({'token': token})}\n\n"
+
+            yield f"data: {json.dumps({'citations': citations})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            print(f"[/answer/stream error] {e}")
+            yield f"data: {json.dumps({'error': 'Stream interrupted'})}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.get("/prompts")
+@limiter.limit(INFO_LIMIT)
+async def get_prompts(request: Request):
+    """Return the current prompt configuration so the frontend can display it."""
+    from app.services.llm import _load_prompts
+    prompts = _load_prompts()
+    return {
+        "system": prompts.get("system", "").strip(),
+        "user_template": prompts.get("user", "").strip(),
+        "no_context": prompts.get("no_context", ""),
+        "temperature": prompts.get("temperature", 0.2),
+    }
